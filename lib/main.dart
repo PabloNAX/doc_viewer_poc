@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show ByteData, rootBundle;
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
@@ -13,10 +14,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'DOC Viewer',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const DocViewer(),
+    return const MaterialApp(
+      home: DocViewer(),
     );
   }
 }
@@ -29,50 +28,51 @@ class DocViewer extends StatefulWidget {
 }
 
 class _DocViewerState extends State<DocViewer> {
-  InAppWebViewController? webViewController;
-  String? fileUrl;
+  late WebViewController _controller;
+  String? _fileUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadDocFile();
+    _initialize();
   }
 
-  Future<void> _loadDocFile() async {
-    // Request storage permission (only required for Android)
+  Future<void> _initialize() async {
+    // 1️⃣ Запрашиваем разрешения (только для Android)
     if (Platform.isAndroid) {
       await Permission.storage.request();
     }
 
-    // Get application documents directory
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/sample.doc';
+    // 2️⃣ Копируем .doc из assets в локальную папку
+    final String filePath = await _copyAssetToLocal('assets/sample.doc');
 
-    // Copy sample.doc from assets to app storage (if needed)
-    final file = File(filePath);
-    if (!file.existsSync()) {
-      final byteData = await DefaultAssetBundle.of(context).load("assets/sample.doc");
-      final buffer = byteData.buffer;
-      await file.writeAsBytes(buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
-    }
-
-    // Set file URL for WebView
+    // 3️⃣ Формируем file:// URL
     setState(() {
-      fileUrl = "file://$filePath";
+      _fileUrl = 'file://$filePath';
     });
+
+    // 4️⃣ Загружаем файл в WebView
+    _controller.loadRequest(Uri.parse(_fileUrl!));
+  }
+
+  Future<String> _copyAssetToLocal(String assetPath) async {
+    final ByteData data = await rootBundle.load(assetPath);
+    final Directory dir = await getApplicationDocumentsDirectory();
+    final File file = File('${dir.path}/sample.doc');
+    await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+    return file.path;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("DOC Viewer")),
-      body: fileUrl == null
+      appBar: AppBar(title: const Text('DOC Viewer')),
+      body: _fileUrl == null
           ? const Center(child: CircularProgressIndicator())
-          : InAppWebView(
-        initialUrlRequest: URLRequest(url: WebUri(fileUrl!)),
-        onWebViewCreated: (controller) {
-          webViewController = controller;
-        },
+          : WebViewWidget(
+        controller: _controller = WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..loadRequest(Uri.parse(_fileUrl!)),
       ),
     );
   }

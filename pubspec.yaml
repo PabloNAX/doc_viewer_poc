@@ -30,9 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_inappwebview: ^6.0.0
+  webview_flutter: ^4.9.0
   path_provider: ^2.1.1
   permission_handler: ^11.0.1
+
 
 
 
