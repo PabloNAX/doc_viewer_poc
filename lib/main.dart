@@ -34,25 +34,32 @@ class _DocViewerState extends State<DocViewer> {
   @override
   void initState() {
     super.initState();
+
+    // 1️⃣ Initialize WebViewController in advance
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+
     _initialize();
   }
 
   Future<void> _initialize() async {
-    // 1️⃣ Запрашиваем разрешения (только для Android)
+    // 2️⃣ Request permissions (Android only)
     if (Platform.isAndroid) {
       await Permission.storage.request();
     }
 
-    // 2️⃣ Копируем .doc из assets в локальную папку
+    // 3️⃣ Copy .doc file from assets to the local directory
     final String filePath = await _copyAssetToLocal('assets/sample.doc');
 
-    // 3️⃣ Формируем file:// URL
+    // 4️⃣ Set the file URL and update UI
     setState(() {
       _fileUrl = 'file://$filePath';
     });
 
-    // 4️⃣ Загружаем файл в WebView
-    _controller.loadRequest(Uri.parse(_fileUrl!));
+    // 5️⃣ Load the file into WebView (if _fileUrl is set)
+    if (_fileUrl != null) {
+      _controller.loadRequest(Uri.parse(_fileUrl!));
+    }
   }
 
   Future<String> _copyAssetToLocal(String assetPath) async {
@@ -69,11 +76,7 @@ class _DocViewerState extends State<DocViewer> {
       appBar: AppBar(title: const Text('DOC Viewer')),
       body: _fileUrl == null
           ? const Center(child: CircularProgressIndicator())
-          : WebViewWidget(
-        controller: _controller = WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..loadRequest(Uri.parse(_fileUrl!)),
-      ),
+          : WebViewWidget(controller: _controller),
     );
   }
 }
